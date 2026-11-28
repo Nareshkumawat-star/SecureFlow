@@ -66,7 +66,9 @@ import {
   parseStagedArg,
   parseBaselineArg,
   parseWatchArg,
+  parseConcurrencyArg,
 } from "./lib/output-args.js";
+import { scanFilesInPool } from "./worker-pool.js";
 import {
   DEFAULT_BASELINE_FILENAME,
   loadBaseline,
@@ -199,6 +201,7 @@ Commands:
 
 Options:
   -w, --watch            Watch workspace for file changes and rescan continuously
+  --concurrency <num>    Number of concurrent file scan workers (default: CPU count)
   --baseline [file]      Path to baseline file to suppress legacy findings (default: .secureflow-baseline.json)
   --staged               Scan only the staged diff (blocks commits on secrets at configured severity)
   --init                 Initialize SecureFlow (interactive wizard for git hooks, .secureflow.json, and .secureflowignore)
@@ -780,6 +783,7 @@ Description:
   let noCache = false;
   let customCacheDir: string | undefined;
   let failOnThreshold: FailOnSeverity | null = null;
+  let concurrency = 1;
   const ignoreSuppressions = parseIgnoreSuppressionsArg(process.argv);
 
   try {
@@ -794,6 +798,7 @@ Description:
     noCache = parseNoCacheArg(process.argv);
     customCacheDir = parseCacheDirArg(process.argv);
     failOnThreshold = parseFailOnArg(process.argv);
+    concurrency = parseConcurrencyArg(process.argv);
   } catch (error) {
     if (!(error instanceof CliUsageError)) throw error;
     console.error(`❌ [SecureFlow] ${error.message}`);
@@ -916,127 +921,67 @@ Description:
   });
 
   if (filesToScan.length > 0) {
-    for (let i = 0; i < filesToScan.length; i++) {
-      const filePath = filesToScan[i]!;
-      progress.update(i + 1, filePath);
-      const startFileTime = performance.now();
-      let content: string | null = null;
+    const poolResult = await scanFilesInPool(filesToScan, {
+      concurrency,
+      customIgnores,
+      optionsOrCustomRules: {
+        ...(ignoreSuppressions ? { ignoreSuppressions } : {}),
+        ...(customRules.length > 0 ? { customRules } : {}),
+      },
+      repoRoot,
+      isDirMode,
+      isSinceMode,
+      isStagedMode,
+      noCache,
+      customCacheDir,
+      loadedBaseline,
+      readStagedContent,
+      getStagedDiffLineNumbers,
+      onProgress: (current, _total, filePath) => {
+        progress.update(current, filePath);
+      },
+      onNotice: (msg) => {
+        if (format === "text") {
+          progress.clear();
+          console.log(msg);
+        }
+      },
+      onError: (filePath, err) => {
+        if (format === "text") {
+          progress.clear();
+          console.error(`⚠️  [SecureFlow] Error reading ${filePath}: ${err.message}`);
+        }
+      },
+    });
+    progress.done();
 
-      if (isDirMode || isSinceMode) {
-        try {
-          const resolvedPath = repoRoot ? path.resolve(repoRoot, filePath) : filePath;
-          if (fs.existsSync(resolvedPath)) {
-            content = fs.readFileSync(resolvedPath, "utf-8");
+    fileResults.push(...poolResult.fileResults);
+    unreadable.push(...poolResult.unreadable);
+    stagedForAi.push(...poolResult.stagedForAi);
+    cachedAiFindings.push(...poolResult.cachedAiFindings);
+    newlyAnalyzed.push(...poolResult.newlyAnalyzed);
+    analyzedCount = poolResult.analyzedCount;
+    cachedCount = poolResult.cachedCount;
+    skippedCount = poolResult.skippedCount;
+    violationCount = poolResult.violationCount;
+    baselineSuppressedCount = poolResult.baselineSuppressedCount;
+
+    if (format === "text") {
+      for (const result of poolResult.fileResults) {
+        const timing = poolResult.fileTimings.get(result.path);
+        if (VERBOSE && timing) {
+          if (result.skipped) {
+            reportSkipped(result);
           } else {
-            content = readStagedContent(filePath);
-          }
-        } catch {
-          content = null;
-        }
-      } else {
-        content = readStagedContent(filePath);
-      }
-
-      if (content === null) {
-        unreadable.push(filePath);
-        continue;
-      }
-
-      const cached = !noCache
-        ? getCacheEntry({ filePath, content, cacheDir: customCacheDir })
-        : null;
-
-      if (cached) {
-        cachedCount++;
-        const elapsedMs = performance.now() - startFileTime;
-        const result: FileScanResult = {
-          ...cached.result,
-          path: filePath,
-        };
-        if (isStagedMode) {
-          const diffLines = getStagedDiffLineNumbers(filePath, repoRoot);
-          if (diffLines && diffLines.size > 0) {
-            result.violations = result.violations.filter((v) => diffLines.has(v.line));
+            reportFileTiming(result.path, timing.elapsedMs, timing.cached);
           }
         }
-        let effectiveResult = result;
-        if (loadedBaseline) {
-          const filtered = filterResultsWithBaseline([result], loadedBaseline);
-          effectiveResult = filtered.results[0]!;
-          baselineSuppressedCount += filtered.suppressedCount;
-        }
-        fileResults.push(effectiveResult);
-        if (effectiveResult.skipped) {
-          skippedCount++;
-        }
-        if (cached.aiFindings && cached.aiFindings.length > 0) {
-          cachedAiFindings.push(
-            ...cached.aiFindings.map((f) => ({ ...f, fileLocation: filePath })),
-          );
-        }
-        if (format === "text") {
-          if (VERBOSE) {
-            progress.clear();
-            if (effectiveResult.skipped) {
-              reportSkipped(effectiveResult);
-            } else {
-              reportFileTiming(filePath, elapsedMs, true);
-            }
-          }
-          if (effectiveResult.violations.length > 0) {
-            progress.clear();
-            reportViolations(effectiveResult);
-          }
-        }
-        violationCount += effectiveResult.violations.length;
-      } else {
-        analyzedCount++;
-        const rawResult = scanFile(filePath, content, customIgnores, {
-          ...(ignoreSuppressions ? { ignoreSuppressions } : {}),
-          ...(customRules.length > 0 ? { customRules } : {}),
-        });
-        if (isStagedMode) {
-          const diffLines = getStagedDiffLineNumbers(filePath, repoRoot);
-          if (diffLines && diffLines.size > 0) {
-            rawResult.violations = rawResult.violations.filter((v) => diffLines.has(v.line));
-          }
-        }
-        const elapsedMs = performance.now() - startFileTime;
-        newlyAnalyzed.push({ filePath, content, result: rawResult });
-
-        let effectiveResult = rawResult;
-        if (loadedBaseline) {
-          const filtered = filterResultsWithBaseline([rawResult], loadedBaseline);
-          effectiveResult = filtered.results[0]!;
-          baselineSuppressedCount += filtered.suppressedCount;
-        }
-
-        fileResults.push(effectiveResult);
-        if (effectiveResult.skipped) {
-          skippedCount++;
-        }
-        if (format === "text") {
-          if (VERBOSE) {
-            progress.clear();
-            if (effectiveResult.skipped) {
-              reportSkipped(effectiveResult);
-            } else {
-              reportFileTiming(filePath, elapsedMs, false);
-            }
-          }
-          if (effectiveResult.violations.length > 0) {
-            progress.clear();
-            reportViolations(effectiveResult);
-          }
-        }
-        violationCount += effectiveResult.violations.length;
-
-        if (!effectiveResult.skipped) {
-          stagedForAi.push({ path: filePath, content });
+        if (result.violations.length > 0) {
+          progress.clear();
+          reportViolations(result);
         }
       }
     }
-    progress.done();
   }
 
   if (!QUIET && baselineSuppressedCount > 0) {

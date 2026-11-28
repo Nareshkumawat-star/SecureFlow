@@ -1,3 +1,4 @@
+import os from "node:os";
 import type { OutputFormat } from "../scanner.js";
 
 /**
@@ -432,4 +433,37 @@ export function parseWatchArg(argv: readonly string[]): boolean {
     argv.some((arg) => arg.startsWith("--watch=")) ||
     argv[2] === "watch"
   );
+}
+
+/**
+ * Returns the default concurrency based on CPU core count.
+ */
+export function getDefaultConcurrency(): number {
+  if (typeof os.availableParallelism === "function") {
+    try {
+      return Math.max(1, os.availableParallelism());
+    } catch {
+      // fallback to cpus
+    }
+  }
+  const cpus = os.cpus();
+  return Math.max(1, cpus ? cpus.length : 1);
+}
+
+/**
+ * Parse `--concurrency <num>` or `--concurrency=<num>`, defaulting to CPU core count.
+ */
+export function parseConcurrencyArg(argv: readonly string[]): number {
+  const raw = optionValue(argv, ["--concurrency"]);
+  if (raw === undefined) {
+    return getDefaultConcurrency();
+  }
+  if (raw === null || raw.trim().length === 0) {
+    throw new CliUsageError("--concurrency requires an integer value greater than 0");
+  }
+  const num = parseInt(raw.trim(), 10);
+  if (isNaN(num) || num <= 0 || String(num) !== raw.trim()) {
+    throw new CliUsageError(`Invalid --concurrency "${raw}": expected an integer greater than 0`);
+  }
+  return num;
 }

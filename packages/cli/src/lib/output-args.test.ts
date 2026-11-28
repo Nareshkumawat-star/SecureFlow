@@ -21,6 +21,8 @@ import {
   parseVerbosityArg,
   parseQuietArg,
   parseVerboseArg,
+  getDefaultConcurrency,
+  parseConcurrencyArg,
 } from "./output-args.js";
 
 const argv = (...args: string[]) => ["node", "secureflow", ...args];
@@ -393,5 +395,34 @@ describe("parseVerbosityArg, parseQuietArg, parseVerboseArg", () => {
     expect(() => parseVerbosityArg(argv("--quiet=true", "--verbose=true"))).toThrow(
       "--quiet and --verbose cannot be combined",
     );
+  });
+});
+
+describe("parseConcurrencyArg", () => {
+  it("defaults to CPU core count / availableParallelism", () => {
+    const defaultVal = getDefaultConcurrency();
+    expect(defaultVal).toBeGreaterThanOrEqual(1);
+    expect(parseConcurrencyArg(argv())).toBe(defaultVal);
+  });
+
+  it("parses valid positive integer concurrency in space-separated and = formats", () => {
+    expect(parseConcurrencyArg(argv("--concurrency", "4"))).toBe(4);
+    expect(parseConcurrencyArg(argv("--concurrency=8"))).toBe(8);
+    expect(parseConcurrencyArg(argv("--concurrency", "1"))).toBe(1);
+  });
+
+  it("throws CliUsageError when value is missing", () => {
+    expect(() => parseConcurrencyArg(argv("--concurrency"))).toThrow(CliUsageError);
+    expect(() => parseConcurrencyArg(argv("--concurrency"))).toThrow(
+      "--concurrency requires an integer value greater than 0",
+    );
+    expect(() => parseConcurrencyArg(argv("--concurrency="))).toThrow(CliUsageError);
+  });
+
+  it("throws CliUsageError when value is not a positive integer", () => {
+    expect(() => parseConcurrencyArg(argv("--concurrency", "0"))).toThrow(CliUsageError);
+    expect(() => parseConcurrencyArg(argv("--concurrency", "-5"))).toThrow(CliUsageError);
+    expect(() => parseConcurrencyArg(argv("--concurrency", "abc"))).toThrow(CliUsageError);
+    expect(() => parseConcurrencyArg(argv("--concurrency", "2.5"))).toThrow(CliUsageError);
   });
 });

@@ -289,8 +289,8 @@ describe("formatScanResults", () => {
     const output = formatScanResults([result], "markdown");
 
     expect(output).toContain("# 🛡️ SecureFlow Scan Report");
-    expect(output).toContain("| File | Line | Violation | Reason |");
-    expect(output).toContain("src/debug.ts");
+    expect(output).toContain("| Severity | Rule | File:Line | Violation | Reason |");
+    expect(output).toContain("src/debug.ts:1");
     expect(output).toContain("environment variable");
   });
 });
