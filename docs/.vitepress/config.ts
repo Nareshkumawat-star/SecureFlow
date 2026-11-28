@@ -67,6 +67,7 @@ export default defineConfig({
           { text: "Deployment & Egress Hardening", link: "/deployment" },
           { text: "Safe Upgrade Guide", link: "/upgrade" },
           { text: "Database Backup & Restore", link: "/database-backup-restore" },
+          { text: "QNX SDP 8.0 Toolchain", link: "/qnx-toolchain" },
         ],
       },
       {
@@ -100,6 +101,15 @@ export default defineConfig({
           { text: "Configurable PR Gate (.secureflow.json)", link: "/gate-configuration" },
           { text: "Blocking Merges on Critical Findings", link: "/block-merge-on-critical" },
           { text: "Policy Export and Import Format", link: "/policy-export-import" },
+          { text: "QNX Real-Time Paths", link: "/policies/bound-qnx-real-time-paths" },
+          {
+            text: "QNX Resource Manager Inputs",
+            link: "/policies/validate-qnx-resource-manager-inputs",
+          },
+          {
+            text: "QNX Driver Bounds Checks",
+            link: "/policies/enforce-bounds-checks-in-qnx-drivers",
+          },
         ],
       },
       {
@@ -119,6 +129,7 @@ export default defineConfig({
           { text: "Operations Runbook", link: "/runbook" },
           { text: "Logging & Metrics Observability", link: "/observability" },
           { text: "Threat Intelligence MCP Server", link: "/mcp-server" },
+          { text: "QNX 8.0 Build Provenance", link: "/qnx-build-provenance" },
         ],
       },
       {

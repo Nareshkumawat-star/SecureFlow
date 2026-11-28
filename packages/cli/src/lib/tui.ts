@@ -273,6 +273,18 @@ export function formatSeverityBadge(severity: string): string {
   }
 }
 
+/** Status label used by `secureflow doctor`. Identical to plain text when color is off. */
+export function formatDiagnosticBadge(status: "pass" | "warn" | "fail"): string {
+  switch (status) {
+    case "pass":
+      return colors.green("✅ [PASS]");
+    case "warn":
+      return colors.yellow("⚠️  [WARN]");
+    case "fail":
+      return colors.red("❌ [FAIL]");
+  }
+}
+
 export interface TableRow {
   severity: string;
   location: string;
@@ -334,7 +346,7 @@ export function formatTuiScanSummary(
       tableRows.push({
         severity: v.severity || "HIGH",
         location: `${res.path}:${v.line}`,
-        rule: "Secret Logging",
+        rule: v.ruleId?.startsWith("QNX-") ? v.ruleId : "Secret Logging",
         details: v.reason || v.text.trim().slice(0, 45),
       });
     }
