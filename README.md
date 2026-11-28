@@ -247,6 +247,11 @@ Run its tests:
 
     npx vitest run src/lib/armor/secret-detector.test.ts src/lib/armor/secret-detector.prescreen.test.ts src/lib/armor/secret-detector.llm-payload.test.ts
 
+Run the ReDoS adversarial stress tests and large-file regression benchmark (#1517):
+
+    npm run test:redos
+    # or: npx vitest run src/lib/armor/secret-detector.redos.test.ts
+
 ---
 
 ## 🛠️ Tech Stack

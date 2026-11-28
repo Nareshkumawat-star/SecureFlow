@@ -194,7 +194,7 @@ describe("ArmorIQScanner deterministic pre-scanner integration (#1448)", () => {
     const scanner = new ArmorIQScanner();
     const files = [
       {
-        filename: "src/credentials.ts",
+        filename: "src/config.ts",
         patch: [
           "@@ -1,2 +1,3 @@",
           " import fs from 'fs';",
@@ -207,7 +207,7 @@ describe("ArmorIQScanner deterministic pre-scanner integration (#1448)", () => {
     const findings = await scanner.scanPullRequest(files);
     expect(findings).toHaveLength(1);
     expect(findings[0].type).toBe("Secret");
-    expect(findings[0].fileLocation).toBe("src/credentials.ts");
+    expect(findings[0].fileLocation).toBe("src/config.ts");
     expect(findings[0].lineStart).toBe(2);
     expect(findings[0].codeSnippet).not.toContain("ghp_1234567890abcdef1234567890abcdef1234");
   });

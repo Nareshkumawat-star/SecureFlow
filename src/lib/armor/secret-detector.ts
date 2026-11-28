@@ -139,7 +139,7 @@ export const SECRET_FAMILIES: readonly SecretFamily[] = [
     name: "Quoted Secret Assignment",
     severity: "CRITICAL",
     pattern:
-      /(?:(?<=[^\w])|^)(?:[a-zA-Z0-9_.-]*(?:secret|token|password|passwd|pwd|api_key|apikey)[a-zA-Z0-9_.-]*)\s*[:=]\s*(["'`])([^"'\`\n]{16,})\1/gi,
+      /(?:(?<=[^\w])|^)(?=[a-zA-Z0-9_])(?:[a-zA-Z0-9_.-]*?(?:secret|token|password|passwd|pwd|api_key|apikey)[a-zA-Z0-9_.-]*)\s*[:=]\s*(["'`])([^"'\`\n]{16,})\1/gi,
     extractValue: (match: RegExpExecArray) => match[2],
   },
 ];

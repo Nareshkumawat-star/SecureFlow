@@ -19,6 +19,7 @@
     "typecheck": "tsc --noEmit",
     "test": "cross-env GROQ_API_KEY=test-key npx vitest run -u",
     "test:coverage": "vitest run --coverage",
+    "test:redos": "vitest run src/lib/armor/secret-detector.redos.test.ts",
     "test:load": "k6 run load-tests/webhook.k6.js",
     "test:load:docker": "docker run --rm -i -v \"$PWD/load-tests:/load-tests\" --network=host grafana/k6 run /load-tests/webhook.k6.js",
     "test:redteam": "vitest run src/ai/flows/heist-prompt-guard.redteam.test.ts",
